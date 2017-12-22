@@ -1,0 +1,209 @@
+---
+title: "Prediction Assignment"
+author: "Daniel Mainka"
+date: "12/20/2017"
+output: html_document
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Executive Summary
+
+Using devices such as *Jawbone Up*, *Nike FuelBand*, and *Fitbit* it is now possible to collect a large amount of data about personal activity relatively inexpensively.  One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+In this project, our goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to attempt to predict how well they performed a specific activity.  
+
+The activity each participant was asked to perform was one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions:
+
+- Exactly according to the specification (Class A)
+- Throwing the elbows to the front (Class B)
+- Lifting the dumbbell only halfway (Class C) 
+- Lowering the dumbbell only halfway (Class D)
+- Throwing the hips to the front (Class E)
+
+Additional details can be found at the following website: [Human Activity Recognition Study link](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har).
+
+- Data used to build the prediction model can be found here: [Training Data](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv), and
+- Data used to judge the model's predictions can be found here: [Test Data](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv).
+
+```{r getData, echo=TRUE, cache=TRUE}
+trainURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+trainDf <- read.csv(trainURL, row.names=1, as.is=TRUE, na.strings=c("NA", "#DIV/0!", ""))
+testDf <- read.csv(testURL, row.names=1, as.is=TRUE, na.strings=c("NA", "#DIV/0!", ""))
+```
+
+The training data consists of `r nrow(trainDf)` observations of `r ncol(trainDf)` different variables/features.
+
+## Data Transformations
+
+The only data transformation made was to convert the classe variable (outcome we want to predict) from class *chr* to *factor*.
+
+```{r transformations, echo=TRUE}
+trainDf$classe <- as.factor(trainDf$classe)
+```
+
+## Feature Selection
+
+Of the original `r ncol(trainDf)` variables/features many were eliminated for 1 of the following reasons:
+
+- All, or most (> 95%), of the training observations for the feature were NAs, or
+- All training observations outside of NAs contained only a single value and thus weren't providing any differentiation or value for prediction, or
+- The feature in the test data was all NAs and thus couldn't be used to improve the prediction, or
+- Misc columns not useful for projection such as: `r paste(names(trainDf[, 1:6]), sep=",")`.
+
+The code used to do this is shown below:
+
+```{r featureSelection, echo=TRUE}
+#get columns containing all or mostly NAs
+naCols <- names(trainDf)[sapply(trainDf, function(x) { all(is.na(x)) })]
+naPercent <- sapply(trainDf, function(x) sum(is.na(x))/length(x))
+mainlyNaCols <- names(trainDf)[(naPercent > 0.95)]
+#get single valued columns
+singleValCols <- names(trainDf)[sapply(trainDf, function(x) { length(unique(x[!is.na(x)])) == 1 })]
+#get columns in testDf that have only NAs
+testDfNaCols <- names(testDf)[sapply(testDf, function(x) { all(is.na(x)) })]
+#misc columns not likely to be useful (normally I'd include user_name here but since they are both
+#common in the traininDf and testDf I kept it in case there were some user specific idiosynchrasies)
+miscCols <- names(trainDf[, 1:6])
+
+#aggregate into a single vector
+colsToDelete <- unique(c(naCols, singleValCols, mainlyNaCols, testDfNaCols, miscCols))
+
+#delete useless columns
+trainDf = trainDf[, !(names(trainDf) %in% colsToDelete)]
+testDf = testDf[, !(names(testDf) %in% colsToDelete)]
+```
+
+Removing these columns leaves a total of `r ncol(trainDf)` variables/features to use for our prediction model building.
+
+## Exploratory Data Analysis
+
+```{r table, comment=""}
+table(trainDf$classe)/nrow(trainDf)
+```
+
+## Model Building
+
+I tried 4 separate models as well as a combination of these 4 as potential candidates for my predictive model.  The models include:
+
+1.  Random Forests
+2.  Generalized Boosted Regression Model
+3.  Support Vector Machine (SVM)
+4.  Linear Discriminant Analysis (LDA)
+5.  Combination of 1, 2, 3 & 4 to see if we can improve on the best of the individual models.
+
+As a result of using and selecting amongst these 5 potential models I further divided the training data into train/test subsets.  The train subset to fit the models & parameter tuning and the test subset to evaluate and select among the different models.
+
+```{r echo=FALSE, include=FALSE}
+library(caret)
+```
+```{r partition}
+#Partition the trainingDf into train & test
+inTrain <- createDataPartition(y=trainDf$classe, p=0.7, list=FALSE)
+train <- trainDf[inTrain, ]
+test <- trainDf[-inTrain, ]
+```
+
+```{r parallel, echo=TRUE, include=FALSE}
+#Configure for parallel processing
+library(parallel)
+library(doParallel)
+cluster <- makeCluster(detectCores() - 1) #convention to leave 1 core for OS
+registerDoParallel(cluster)
+set.seed(1) #setting seed for reproducibility
+```
+
+Additionally I used the following trainControl settings which uses k-fold Cross Validation (k=5) and allow for parallelism to speed up compuations.  The following was run to generate the main fits:
+
+```{r fits, cache=TRUE}
+trainControl <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
+
+fitRF <- train(classe ~ ., data=train, method="rf", trControl=trainControl)
+fitGBM <- train(classe ~ ., data=train, method="gbm", trControl=trainControl, verbose=FALSE)
+fitSVM <- train(classe ~ ., data=train, method="svmRadial", preProcess = c("center", "scale"), trControl=trainControl)
+fitLDA <- train(classe ~ ., data=train, method="lda", trControl=trainControl)
+```
+
+To compute the combined model I did the following:
+
+```{r fitCOMB, cache=TRUE}
+predRF <- predict(fitRF, newdata=test)
+predGBM <- predict(fitGBM, newdata=test)
+predSVM <- predict(fitSVM, newdata=test)
+predLDA <- predict(fitLDA, newdata=test)
+
+predDF <- data.frame(predRF, predGBM, predSVM, predLDA, classe=test$classe)
+
+fitCOMB <- train(classe ~ ., method="rf", data=predDF, trControl=trainControl)
+
+predCOMB <- predict(fitCOMB, newdata=predDF)
+```
+
+## Model Evaluation
+
+### Random Forests
+```{r evalRF, comment=""}
+confusionMatrix(data=predRF, reference=test$classe)
+```
+
+### Generalized Boosted Regression Model
+```{r evalGBM, comment=""}
+confusionMatrix(data=predGBM, reference=test$classe)
+```
+
+### Support Vector Machine (SVM)
+```{r evalSVM, comment=""}
+confusionMatrix(data=predSVM, reference=test$classe)
+```
+
+### Linear Discriminant Analysis (LDA)
+```{r evalLDA, comment=""}
+confusionMatrix(data=predLDA, reference=test$classe)
+```
+
+### Combined Model
+```{r evalCOMB, comment=""}
+confusionMatrix(data=predCOMB, reference=test$classe)
+```
+
+## Conclusions
+
+Using accuracy (average over the 5-fold cross validated results shows gives us the following ordering for the models:  Combined ~= Random Forests > Generalized Boosted Regression Model > SVM > LDA.
+
+There was really no real practical difference between the combined model and Random Forests so I used the Combined model
+
+```{r predQuiz, comment=""}
+predRFQuiz <- predict(fitRF, newdata=testDf)
+predGBMQuiz <- predict(fitGBM, newdata=testDf)
+predSVMQuiz <- predict(fitSVM, newdata=testDf)
+predLDAQuiz <- predict(fitLDA, newdata=testDf)
+predDfQuiz <- data.frame(predRF=predRFQuiz, predGBM=predGBMQuiz, predSVM=predSVMQuiz, predLDA=predLDAQuiz)
+
+predQuiz <- predict(fitCOMB, newdata=predDfQuiz)
+predDfQuiz$predQuiz <- predQuiz
+predDfQuiz
+```
+
+<!--
+---
+<P style="page-break-before: always">
+
+# Appendix
+
+**Summary of Features for Training Data Set**
+
+```{r summary, echo=FALSE}
+#str(trainDf)
+```
+
+-->
+
+```{r parallelShutdown, echo=FALSE}
+#De-register parallel processing cluster
+stopCluster(cluster)
+registerDoSEQ()
+```
