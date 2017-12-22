@@ -80,12 +80,6 @@ testDf = testDf[, !(names(testDf) %in% colsToDelete)]
 
 Removing these columns leaves a total of `r ncol(trainDf)` variables/features to use for our prediction model building.
 
-## Exploratory Data Analysis
-
-```{r table, comment=""}
-table(trainDf$classe)/nrow(trainDf)
-```
-
 ## Model Building
 
 I tried 4 separate models as well as a combination of these 4 as potential candidates for my predictive model.  The models include:
@@ -172,9 +166,11 @@ confusionMatrix(data=predCOMB, reference=test$classe)
 
 ## Conclusions
 
-Using accuracy (average over the 5-fold cross validated results shows gives us the following ordering for the models:  Combined ~= Random Forests > Generalized Boosted Regression Model > SVM > LDA.
+Using accuracy (average over the 5-fold cross validated results shows gives us the following ordering for the models:  Combined > Random Forests > Generalized Boosted Regression Model > SVM > LDA.
 
-There was really no real practical difference between the combined model and Random Forests so I used the Combined model
+The Combined model does appear to have the best accuracy so I chose to use that for making the final predictions for the Quiz.  However the improvement is only a tiny bit better than the Random Forest model and any one of the Random Forest (RF)  Generalized Boosted Regression (GBM) and Combined model all give the same answers in the end.
+
+Shown below is the code and resulting final predictions for the *testDf* data.frame:
 
 ```{r predQuiz, comment=""}
 predRFQuiz <- predict(fitRF, newdata=testDf)

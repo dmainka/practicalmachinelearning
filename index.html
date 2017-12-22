@@ -397,8 +397,9 @@ Balanced Accuracy      0.9990   0.9973   0.9925   0.9910   0.9984</code></pre>
 </div>
 <div id="conclusions" class="section level2">
 <h2>Conclusions</h2>
-<p>Using accuracy (average over the 5-fold cross validated results shows gives us the following ordering for the models: Combined ~= Random Forests &gt; Generalized Boosted Regression Model &gt; SVM &gt; LDA.</p>
-<p>There was really no real practical difference between the combined model and Random Forests so I used the Combined model</p>
+<p>Using accuracy (average over the 5-fold cross validated results shows gives us the following ordering for the models: Combined &gt; Random Forests &gt; Generalized Boosted Regression Model &gt; SVM &gt; LDA.</p>
+<p>The Combined model does appear to have the best accuracy so I chose to use that for making the final predictions for the Quiz. However the improvement is only a tiny bit better than the Random Forest model and any one of the Random Forest (RF) Generalized Boosted Regression (GBM) and Combined model all give the same answers in the end.</p>
+<p>Shown below is the code and resulting final predictions for the <em>testDf</em> data.frame:</p>
 <pre class="r"><code>predRFQuiz &lt;- predict(fitRF, newdata=testDf)
 predGBMQuiz &lt;- predict(fitGBM, newdata=testDf)
 predSVMQuiz &lt;- predict(fitSVM, newdata=testDf)
