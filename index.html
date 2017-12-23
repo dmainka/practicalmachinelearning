@@ -205,7 +205,7 @@ fitRF &lt;- train(classe ~ ., data=train, method=&quot;rf&quot;, trControl=train
 fitGBM &lt;- train(classe ~ ., data=train, method=&quot;gbm&quot;, trControl=trainControl, verbose=FALSE)
 fitSVM &lt;- train(classe ~ ., data=train, method=&quot;svmRadial&quot;, preProcess = c(&quot;center&quot;, &quot;scale&quot;), trControl=trainControl)
 fitLDA &lt;- train(classe ~ ., data=train, method=&quot;lda&quot;, trControl=trainControl)</code></pre>
-<p>To compute the combined model I did the following:</p>
+<p>To compute the combined model I combined the individual models using another Random Forest as shown below.</p>
 <pre class="r"><code>predRF &lt;- predict(fitRF, newdata=test)
 predGBM &lt;- predict(fitGBM, newdata=test)
 predSVM &lt;- predict(fitSVM, newdata=test)
@@ -219,6 +219,7 @@ predCOMB &lt;- predict(fitCOMB, newdata=predDF)</code></pre>
 </div>
 <div id="model-evaluation" class="section level2">
 <h2>Model Evaluation</h2>
+<p>The model results computed on the test data set are shown below:</p>
 <div id="random-forests" class="section level3">
 <h3>Random Forests</h3>
 <pre class="r"><code>confusionMatrix(data=predRF, reference=test$classe)</code></pre>
@@ -397,7 +398,7 @@ Balanced Accuracy      0.9990   0.9973   0.9925   0.9910   0.9984</code></pre>
 </div>
 <div id="conclusions" class="section level2">
 <h2>Conclusions</h2>
-<p>Using accuracy (average over the 5-fold cross validated results shows gives us the following ordering for the models: Combined &gt; Random Forests &gt; Generalized Boosted Regression Model &gt; SVM &gt; LDA.</p>
+<p>Using accuracy (average over the 5-fold cross validated results on the test set) gives us the following ordering for the models: Combined (0.9937) &gt; Random Forests (0.9934) &gt; Generalized Boosted Regression Model (0.9635) &gt; SVM (0.9254) &gt; LDA (0.7062).</p>
 <p>The Combined model does appear to have the best accuracy so I chose to use that for making the final predictions for the Quiz. However the improvement is only a tiny bit better than the Random Forest model and any one of the Random Forest (RF) Generalized Boosted Regression (GBM) and Combined model all give the same answers in the end.</p>
 <p>Shown below is the code and resulting final predictions for the <em>testDf</em> data.frame:</p>
 <pre class="r"><code>predRFQuiz &lt;- predict(fitRF, newdata=testDf)

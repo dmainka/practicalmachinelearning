@@ -122,7 +122,7 @@ fitSVM <- train(classe ~ ., data=train, method="svmRadial", preProcess = c("cent
 fitLDA <- train(classe ~ ., data=train, method="lda", trControl=trainControl)
 ```
 
-To compute the combined model I did the following:
+To compute the combined model I combined the individual models using another Random Forest as shown below.
 
 ```{r fitCOMB, cache=TRUE}
 predRF <- predict(fitRF, newdata=test)
@@ -138,6 +138,8 @@ predCOMB <- predict(fitCOMB, newdata=predDF)
 ```
 
 ## Model Evaluation
+
+The model results computed on the test data set are shown below:
 
 ### Random Forests
 ```{r evalRF, comment=""}
@@ -166,7 +168,7 @@ confusionMatrix(data=predCOMB, reference=test$classe)
 
 ## Conclusions
 
-Using accuracy (average over the 5-fold cross validated results shows gives us the following ordering for the models:  Combined > Random Forests > Generalized Boosted Regression Model > SVM > LDA.
+Using accuracy (average over the 5-fold cross validated results on the test set) gives us the following ordering for the models:  Combined (0.9937) > Random Forests (0.9934) > Generalized Boosted Regression Model (0.9635) > SVM (0.9254) > LDA (0.7062).
 
 The Combined model does appear to have the best accuracy so I chose to use that for making the final predictions for the Quiz.  However the improvement is only a tiny bit better than the Random Forest model and any one of the Random Forest (RF)  Generalized Boosted Regression (GBM) and Combined model all give the same answers in the end.
 
